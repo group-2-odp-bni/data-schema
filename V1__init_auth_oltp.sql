@@ -1,29 +1,51 @@
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+CREATE SCHEMA IF NOT EXISTS domain;
 CREATE SCHEMA IF NOT EXISTS auth_oltp;
 
 DO $$ BEGIN
-  CREATE TYPE auth_oltp.user_status AS ENUM ('ACTIVE', 'SUSPENDED');
+  CREATE TYPE domain.user_status AS ENUM ('PENDING_VERIFICATION','ACTIVE','SUSPENDED','LOCKED');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-CREATE TABLE IF NOT EXISTS auth_oltp.users (
-  id UUID PRIMARY KEY,
-  email VARCHAR(320) NOT NULL UNIQUE,
-  nik VARCHAR(32) NOT NULL,
-  phone VARCHAR(32),
-  name VARCHAR(200),
-  status auth_oltp.user_status NOT NULL DEFAULT 'ACTIVE',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+CREATE OR REPLACE FUNCTION domain.set_updated_at() RETURNS trigger AS $$
+BEGIN NEW.updated_at := now(); RETURN NEW; END; $$ LANGUAGE plpgsql;
+
+CREATE TABLE auth_oltp.users (
+  id                UUID PRIMARY KEY                DEFAULT gen_random_uuid(),
+  phone_number      VARCHAR(32)            NOT NULL UNIQUE,
+  name              VARCHAR(200)           NOT NULL,
+  pin_hash          VARCHAR(255)           NOT NULL,
+  status            domain.user_status     NOT NULL  DEFAULT 'PENDING_VERIFICATION',
+  profile_image_url TEXT,
+  email_verified    BOOLEAN                           DEFAULT FALSE,
+  phone_verified    BOOLEAN                           DEFAULT FALSE,
+  created_at        TIMESTAMPTZ             NOT NULL  DEFAULT now(),
+  updated_at        TIMESTAMPTZ             NOT NULL  DEFAULT now(),
+  last_login_at     TIMESTAMPTZ,
+  CONSTRAINT chk_phone_format CHECK (phone_number ~ '^\+[1-9]\d{1,14}$')
 );
 
-CREATE TABLE IF NOT EXISTS auth_oltp.otp_sessions (
-  otp_id UUID PRIMARY KEY,
-  phone_number VARCHAR(32) NOT NULL,
-  otp_code VARCHAR(12) NOT NULL,
-  purpose VARCHAR(64) NOT NULL,         
-  expires_at TIMESTAMPTZ NOT NULL,
-  is_used BOOLEAN NOT NULL DEFAULT FALSE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+CREATE TRIGGER trg_auth_users_updated_at
+BEFORE UPDATE ON auth_oltp.users
+FOR EACH ROW EXECUTE FUNCTION domain.set_updated_at();
+
+CREATE INDEX idx_auth_users_phone_number ON auth_oltp.users (phone_number);
+
+CREATE TABLE auth_oltp.refresh_tokens (
+  id           UUID PRIMARY KEY                DEFAULT gen_random_uuid(),
+  user_id      UUID                   NOT NULL REFERENCES auth_oltp.users (id) ON DELETE CASCADE,
+  token_hash   VARCHAR(255)           NOT NULL UNIQUE,
+  expiry_date  TIMESTAMPTZ            NOT NULL,
+  ip_address   VARCHAR(45)            NOT NULL,
+  user_agent   VARCHAR(256)           NOT NULL,
+  last_used_at TIMESTAMPTZ            NOT NULL DEFAULT now(),
+  is_revoked   BOOLEAN                           DEFAULT FALSE,
+  revoked_at   TIMESTAMPTZ
 );
 
-CREATE INDEX IF NOT EXISTS idx_users_email ON auth_oltp.users (email);
-CREATE INDEX IF NOT EXISTS idx_otp_phone_purpose ON auth_oltp.otp_sessions (phone_number, purpose);
+CREATE INDEX idx_auth_refresh_user_active
+  ON auth_oltp.refresh_tokens (user_id, is_revoked, expiry_date DESC);
+
+CREATE INDEX idx_auth_refresh_active_hash
+  ON auth_oltp.refresh_tokens (token_hash)
+  WHERE is_revoked = FALSE;
