@@ -24,7 +24,7 @@ jobs:
         run: pip install sqlfluff
 
       - name: Lint SQL files
-        run: sqlfluff lint schemas/ --dialect postgres
+        run: sqlfluff lint data-schema/ --dialect postgres
 
       - name: Dry-run auto-fix
-        run: sqlfluff fix schemas/ --dry-run --dialect postgres
+        run: sqlfluff fix data-schema/ --dry-run --dialect postgres
