@@ -1,0 +1,30 @@
+name: SQL CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-validate:
+    name: Lint & Validate SQL
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install sqlfluff
+        run: pip install sqlfluff
+
+      - name: Lint SQL files
+        run: sqlfluff lint schemas/ --dialect postgres
+
+      - name: Dry-run auto-fix
+        run: sqlfluff fix schemas/ --dry-run --dialect postgres
