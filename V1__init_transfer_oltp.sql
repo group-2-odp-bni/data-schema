@@ -4,7 +4,7 @@ CREATE SCHEMA IF NOT EXISTS domain;
 CREATE SCHEMA IF NOT EXISTS transfer_oltp;
 
 DO $$ BEGIN
-  CREATE TYPE domain.tx_type AS ENUM ('TRANSFER');
+  CREATE TYPE domain.tx_type AS ENUM ('TRANSFER','TOPUP');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
