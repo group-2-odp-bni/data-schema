@@ -1,14 +1,16 @@
-CREATE SCHEMA IF NOT EXISTS transfer_read;
+CREATE SCHEMA IF NOT EXISTS transaction_read;
 
-CREATE TABLE IF NOT EXISTS transfer_read.wallet_status_projection (
+CREATE TABLE IF NOT EXISTS transaction_read.wallet_status_projection
+(
   wallet_id   UUID PRIMARY KEY,
   status      domain.wallet_status NOT NULL,
   updated_at  TIMESTAMPTZ          NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_transfer_walletproj_status ON transfer_read.wallet_status_projection (status);
+CREATE INDEX IF NOT EXISTS idx_transfer_walletproj_status ON transaction_read.wallet_status_projection (status);
 
-CREATE TABLE IF NOT EXISTS transfer_read.transactions (
+CREATE TABLE IF NOT EXISTS transaction_read.transactions
+(
   id           UUID PRIMARY KEY,
   wallet_id    UUID                  NOT NULL,
   trx_id       VARCHAR               NOT NULL,
@@ -21,5 +23,5 @@ CREATE TABLE IF NOT EXISTS transfer_read.transactions (
   updated_at   TIMESTAMPTZ           NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_transfer_read_wallet_ts ON transfer_read.transactions (wallet_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_transfer_read_status_ts ON transfer_read.transactions (status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_transaction_read_wallet_ts ON transaction_read.transactions (wallet_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_transaction_read_status_ts ON transaction_read.transactions (status, created_at DESC);
